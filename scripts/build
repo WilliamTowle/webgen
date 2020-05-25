@@ -1,0 +1,102 @@
+#!/bin/sh
+
+##
+##	global config
+##
+
+##
+##	subroutines
+##
+
+#	if [ "${UID}" != 0 -a "${UID}" ] ; then
+#		echo "Failed: you are not root"
+#		exit 1
+#	fi
+
+do_extract()
+{
+	SOURCE=$1
+	case ${SOURCE} in
+	*.gz)
+		zcat ${SOURCE} | tar xvf -
+		;;
+	*.bz2)
+		bzcat ${SOURCE} | tar xvf -
+		;;
+	*)
+		echo "$0: Extract SOURCE ${SOURCE}: File type unknown" 1>&2
+		exit 1
+		;;
+	esac
+}
+
+make_lynx()
+{
+	SOURCE=$1
+	if [ -z "${SOURCE}" ] ; then
+		echo "$0: make_toolkit(): Need SOURCE" 1>&2
+		exit 1
+	fi
+
+	do_extract $1
+	( cd `basename $1 | sed 's/.tar.bz2//' | sed 's/\./-/g'` || exit 1
+		./configure || exit 1
+
+		[ -r lynx.cfg.OLD ] || mv lynx.cfg lynx.cfg.OLD || exit 1
+		cat lynx.cfg.OLD \
+			| sed '/COLOR:0:/	s/0:.*/0:white:black/' \
+			| sed '/COLOR:1:/	s/1:.*/1:brown:black/' \
+			| sed '/COLOR:2:/	s/2:.*/2:yellow:blue/' \
+			| sed '/COLOR:3:/	s/3:.*/3:green:black/' \
+			| sed '/COLOR:4:/	s/4:.*/4:yellow:black/' \
+			| sed '/COLOR:5:/	s/5:.*/5:blue:black/' \
+			| sed '/COLOR:6:/	s/6:.*/6:brightmagenta:black/' \
+			| sed '/^#*COLOR:7/	s/7:.*/7:magenta:cyan/' \
+			| sed '/^#*COLOR:/	s/^#*//' \
+			> lynx.cfg || exit 1
+
+		make || exit 1
+		make install || exit 1
+	) || exit 1
+}
+make_toolkit()
+{
+	SOURCE=$1
+	if [ -z "${SOURCE}" ] ; then
+		echo "$0: make_toolkit(): Need SOURCE" 1>&2
+		exit 1
+	fi
+
+	do_extract $1
+	( cd `basename $1 | sed 's/.tar.gz//'` || exit 1
+		perl Makefile.PL || exit 1
+		make || exit 1
+		#make test || exit 1
+		make install || exit 1
+	) || exit 1
+}
+
+##
+##	main program
+##
+
+COMMAND=$1
+[ "$1" ] && shift
+case ${COMMAND} in
+lynx)		## build lynx from SOURCE
+	make_lynx $* || exit 1
+	echo "$0: MAKE-LYNX phase OK"
+	;;
+toolkit)	## build Template-Toolkit from SOURCE
+	make_toolkit $* || exit 1
+	echo "$0: MAKE-TOOLKIT phase OK"
+	;;
+*)
+	if [ -n "${COMMAND}" -a "${COMMAND}" != 'help' ] ; then
+		echo "$0: Unrecognised command '${COMMAND}'"
+	fi
+	echo "$0: Usage:"
+	grep "^[0-9a-z]*)" $0 | sed "s/^/	/"
+	exit 1
+	;;
+esac

@@ -1,0 +1,47 @@
+#!/usr/bin/perl -w
+use strict;
+
+#use Template;
+use	FileHandle;
+use	POSIX;
+
+#sub ensure_dir_for
+#{
+#  my $file= shift;
+#  my $parent= $file;
+#	while ( ($parent= $file)=~ s/\/*[^\/]+$// && ! -d $parent )
+#	{
+#	    print "[ need directory $parent ]\n";
+#	    ensure_dir_for($parent);
+#	    mkdir $parent
+#	}
+#}
+
+sub main
+{
+	if (!@_)
+	{
+	    die "$0: No FILEs\n"
+	}
+
+	foreach my $file (@_)
+	{
+	  my $fh= new FileHandle($file)
+			|| warn "$0 failed to open file $file\n";
+	    print "[ $file ]\n";
+
+	  my $content= join '', $fh->getlines;
+	    close $fh;
+
+	    $content=~ s/rollovers=y/rollovers="y"/;
+	    $content=~ s/"	/"\n	/;
+
+	    #$file=~ s/\.pre/.tmpl/;
+
+	    $fh= new FileHandle("> $file") || die "failed > $file";
+	    print $fh $content;
+	    close $fh
+	}
+}
+
+main @ARGV

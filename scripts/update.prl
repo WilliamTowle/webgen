@@ -1,0 +1,125 @@
+#!/usr/bin/perl
+
+use FileHandle;
+
+sub munge_filename
+{
+  my ($from, $to)= @_;
+  my $result= '';
+	while ($from=~ m%/%
+		&& $to=~ s/(\/*[^\/]+)$//)
+	{
+	    $result= "$1$result";
+	    $from=~ s%/+[^/]+$%%
+	}
+
+	# ...need to add some '../'s if non-empty:
+	$to ne '' && die "UNEXPECTED: TO $to";
+
+  return "$from/$result";
+}
+
+sub do_parse
+{
+  my	($file, $line)= @_;
+  my	@files= ();
+
+	# Need +? so both '\s*' deal with whitespace...
+	while ($line=~ s/[[]%\s*(.+?)\s*%[]]//)
+	{
+	  my @args= split m/\s+/, $1;
+	    $args[0] eq 'BLOCK' && next;
+	    $args[0] eq 'END' && next;
+	    if ( $args[0] eq 'INCLUDE' )
+	    {
+	      my $next= munge_filename $file, $args[1];
+		push @files, $next, do_parse($next)
+	    }
+	    else
+	    {
+		die "UNEXPECTED: [% $args[0] ... %]"
+	    }
+	}
+
+  return @files
+}
+
+sub file_list
+{
+  my	$file= shift;
+  my	@files= ($file);
+
+  my	$fh;
+
+	$fh= FileHandle->new($file);
+	foreach my $line (grep m/\[%/, $fh->getlines)
+	{
+	    push @files, do_parse $file, $line
+	}
+
+	close $fh;
+	return @files
+}
+
+sub do_genfrom
+{
+  my	$file= shift;
+  my	@files= file_list $file;
+  my	$target;
+
+	($target= $file)=~ s%.*/%html/%;
+	$target=~ s%.tmpl$%.html%;
+
+	# show modification times...
+	if ( ! -r $target )
+	{
+	    return [$target, $file]
+	}
+	else
+	{
+	  my $targ_age= -M $target;
+	  my $update= 0;
+
+	    foreach my $file (@files)
+	    {
+		$update|= ($targ_age > -M $file)
+	    }
+
+	    return $update? [$target, $file] : undef
+	}
+}
+
+sub do_generate
+{
+  my ($out, $in)= @_;
+	$in=~ s/([^\/]+)\/+// || die "No SUBDIR in $in";
+	system "( cd $1 && tpage $in ) > $out"
+}
+
+sub main
+{
+	if (!@_)
+	{
+	    printf STDERR "No FILEs\n";
+	    exit 1
+	}
+	else
+	{
+	    foreach my $file (@_)
+	    {
+		if ( -d $file )
+		{
+		    die "UNEXPECTED: DIRECTORY $file"
+		}
+		else
+		{
+		    foreach my $array (do_genfrom $file)
+		    {
+			(defined $array) && do_generate @$array
+		    }
+		}
+	    }
+	}
+}
+
+main @ARGV

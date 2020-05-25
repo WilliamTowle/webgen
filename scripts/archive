@@ -1,0 +1,57 @@
+#!/bin/sh
+
+make_content()
+{
+	if [ -z "$1" ] ; then
+		echo "make_content(): expected DIRECTORY/IES"
+		exit 1
+	fi
+
+	WHEN=`date +%y%m%d`
+	for SUBDIR in $* ; do
+		if [ ! -d $SUBDIR ] ; then
+			echo "$0: No SUBDIR $SUBDIR" 1>&2
+		else
+			ARCHIVE=webgen-`echo ${SUBDIR} | sed 's/\///g'`-${WHEN}.tgz
+			echo -n "${ARCHIVE}: "
+			tar cvzf ${ARCHIVE} ${SUBDIR} | while read FILE ; do echo -n '.' ; done
+			echo
+		fi
+	done
+}
+
+make_scripts()
+{
+	ARCHIVE=webgen-scripts-`date +%y%m%d`.tgz
+	echo -n "${ARCHIVE}: "
+	tar cvzf webgen-scripts-${WHEN}.tgz scripts src | while read FILE ; do echo -n '.' ; done
+	echo
+}
+
+make_all()
+{
+	make_content $*
+	make_scripts $*
+}
+
+ACTION=$1
+[ "$1" ] && shift
+case $ACTION in
+all)		## ?
+	make_all $* || exit 1
+	;;
+content) 	## ?
+	make_content $* || exit 1
+	;;
+scripts)	## ?
+	make_scripts || exit 1
+	;;
+*)
+	if [ -n "$COMMAND" -a "$COMMAND" != 'help' ] ; then
+		echo "$0: Unrecognised command '$COMMAND'"
+	fi
+	echo "$0: Usage:"
+	grep "^[0-9a-z]*)" $0 | sed "s/^/	/"
+	exit 1
+	;;
+esac

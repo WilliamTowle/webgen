@@ -1,0 +1,51 @@
+#!/bin/sh
+
+if [ -r bin ] ; then
+	export PATH=`pwd`/bin:${PATH}
+fi
+
+TPAGE=`which tpage 2>/dev/null`
+if [ -z "${TPAGE}" ] ; then
+	echo "$0: Required executable 'tpage' not found" 1>&2
+	exit 1
+fi
+
+if [ -z "$1" ] ; then
+	echo "$0: No PREFIX supplied" 1>&2
+	exit 1
+elif [ ! -d "$1" ] ; then
+	echo "$0: Expected '$1' as directory" 1>&2
+	exit 1
+else
+	PREFIX=$1
+fi
+
+HTMLDIR=`pwd`/html
+if [ ! -d ${HTMLDIR} ] ; then
+	echo "$0: Cannot produce output: No HTMLDIR (./html)" 1>&2
+	exit 1
+fi
+
+( cd ${PREFIX} || exit 1
+	for SUBDIR in tt2 extra ; do
+		if [ -d ${SUBDIR} ] ; then
+			find ${SUBDIR}/* -type d | while read DIR ; do
+				DIRNAME=`echo ${DIR} | sed "s%${SUBDIR}/%${HTMLDIR}/%"`
+				mkdir -p "${DIRNAME}" || exit 1
+			done || exit 1
+
+			find ${SUBDIR} -type f | while read FILE ; do
+				OUTFILE=`echo ${FILE} | sed "s%${SUBDIR}/%${HTMLDIR}/%" | sed 's%\.tmpl%.html%'`
+				case ${FILE} in
+				*.tmpl)	( ${TPAGE} "${FILE}" > "${OUTFILE}" ) 2>&1 | sed "s%^%${FILE}: %" || exit 1
+				;;
+				*.sh.in)	# ignore
+				;;
+				*)	cp "${FILE}" "${OUTFILE}"
+				;;
+				esac
+			done || exit 1
+		fi || exit 1
+	done || exit 1
+	echo "OK"
+)
